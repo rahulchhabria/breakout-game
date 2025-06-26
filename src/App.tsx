@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PongGame from './components/PongGame';
-import { logInfo, addBreadcrumb } from './sentryLogger';
+import { addBreadcrumb } from './sentryLogger';
 
 function App() {
   const [showForm, setShowForm] = useState(false);
@@ -9,7 +9,6 @@ function App() {
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
-    logInfo('App loaded');
     addBreadcrumb('App component mounted');
   }, []);
 
