@@ -15,7 +15,7 @@ Sentry.init({
     // new ProfilingIntegration(), // Uncomment when supported
   ],
   tracesSampleRate: 1.0, // Capture 100% of transactions for performance monitoring
-  replaysSessionSampleRate: 1.0, // Adjust for production (10% of all sessions)
+  replaysSessionSampleRate: 1.0, // Capture 100% of all sessions for testing
   replaysOnErrorSampleRate: 1.0, // 100% of sessions with errors
   // profilesSampleRate: 1.0, // Uncomment when profiling is supported
 });
