@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PongGame from './components/PongGame';
-import { addBreadcrumb } from './sentryLogger';
+import * as Sentry from '@sentry/react';
 
 function App() {
   const [showForm, setShowForm] = useState(false);
@@ -9,7 +9,11 @@ function App() {
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
-    addBreadcrumb('App component mounted');
+    Sentry.addBreadcrumb({
+      category: 'custom',
+      message: 'App component mounted',
+      level: 'info',
+    });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
