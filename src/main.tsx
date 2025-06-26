@@ -1,7 +1,7 @@
 // Import Sentry instrumentation first
 import './sentry';
 
-import React, { StrictMode } from 'react';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as Sentry from '@sentry/react';
 
