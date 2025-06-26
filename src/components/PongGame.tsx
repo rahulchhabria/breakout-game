@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX } from 'lucide-react';
-import { logError } from '../sentryLogger';
+import * as Sentry from '@sentry/react';
 
 interface Brick {
   x: number;
@@ -322,8 +322,8 @@ export default function PongGame() {
             if (brick.hits >= brick.maxHits) {
               brick.destroyed = true;
               playSound(440, 150);
-              // Easter egg: Log a Sentry error when a brick is destroyed
-              logError(`Easter Egg: Brick destroyed! Color: ${brick.color}, Position: (${brick.x}, ${brick.y})`);
+              // Sentry: Log a real error when a brick is destroyed
+              Sentry.captureException(new Error(`Brick destroyed! Color: ${brick.color}, Position: (${brick.x}, ${brick.y})`));
               
               // Chance to drop power-up
               if (Math.random() < 0.15) {
