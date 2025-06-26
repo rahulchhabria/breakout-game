@@ -11,6 +11,8 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types", "./src/types"],
 
     /* Linting */
     "strict": true,
