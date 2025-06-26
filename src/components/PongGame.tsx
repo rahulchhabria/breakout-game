@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX } from 'lucide-react';
+import { logError } from '../sentryLogger';
 
 interface Brick {
   x: number;
@@ -58,7 +59,6 @@ const PADDLE_WIDTH = 120;
 const PADDLE_HEIGHT = 20;
 const BALL_SIZE = 12;
 const INITIAL_BALL_SPEED = 2.5; // Reduced from 4
-const SPEED_INCREASE = 0.2; // Reduced from 0.3
 const BRICK_WIDTH = 75;
 const BRICK_HEIGHT = 25;
 const BRICK_PADDING = 5;
@@ -138,7 +138,7 @@ export default function PongGame() {
     if (!soundEnabled) return;
     
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = new (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       
@@ -153,7 +153,7 @@ export default function PongGame() {
       
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + duration / 1000);
-    } catch (e) {
+    } catch {
       // Silently fail if audio context is not available
     }
   };
@@ -322,6 +322,8 @@ export default function PongGame() {
             if (brick.hits >= brick.maxHits) {
               brick.destroyed = true;
               playSound(440, 150);
+              // Easter egg: Log a Sentry error when a brick is destroyed
+              logError(`Easter Egg: Brick destroyed! Color: ${brick.color}, Position: (${brick.x}, ${brick.y})`);
               
               // Chance to drop power-up
               if (Math.random() < 0.15) {
