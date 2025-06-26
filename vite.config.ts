@@ -11,7 +11,7 @@ export default defineConfig({
     react(),
     sentryVitePlugin({
       org: 'rc-sentry-projects',
-      project: '4509563503640576',
+      project: 'breakout-game',
       authToken: process.env.SENTRY_AUTH_TOKEN, // Set this in your environment
     }),
   ],
