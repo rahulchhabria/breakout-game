@@ -5,6 +5,9 @@ import { sentryVitePlugin, type SentryVitePluginOptions } from '@sentry/vite-plu
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  build: {
+    sourcemap: true,
+  },
   plugins: [
     react(),
     sentryVitePlugin({
@@ -13,13 +16,11 @@ export default defineConfig({
       authToken: process.env.SENTRY_AUTH_TOKEN,
       sourcemaps: {
         assets: './dist',
+        filesToDeleteAfterUpload: ['**/*.js.map'],
       },
     } satisfies SentryVitePluginOptions),
   ],
   optimizeDeps: {
     exclude: ['lucide-react'],
-  },
-  build: {
-    sourcemap: true,
   },
 });
