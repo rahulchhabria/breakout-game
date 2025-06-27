@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       sourcemap: true,
+      minify: 'esbuild',
       rollupOptions: {
         output: {
           manualChunks: {
@@ -23,13 +24,6 @@ export default defineConfig(({ mode }) => {
             vendor: ['react', 'react-dom'],
             sentry: ['@sentry/react'],
           },
-        },
-      },
-      // Ensure proper minification and optimization
-      minify: 'terser',
-      terserOptions: {
-        compress: {
-          drop_console: false, // Keep console logs for Sentry
         },
       },
     },
