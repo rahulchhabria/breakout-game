@@ -25,8 +25,12 @@ function App() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // You need to add an auth token here for production use
-        // 'Authorization': 'Bearer <YOUR_AUTH_TOKEN>'
+        // The auth token is required to post user feedback via the Sentry API
+        // in production. It can be provided at build time using the
+        // VITE_SENTRY_AUTH_TOKEN environment variable.
+        ...(import.meta.env.VITE_SENTRY_AUTH_TOKEN && {
+          Authorization: `Bearer ${import.meta.env.VITE_SENTRY_AUTH_TOKEN}`,
+        }),
       },
       body: JSON.stringify({
         name: email || 'Anonymous',

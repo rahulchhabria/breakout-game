@@ -7,6 +7,8 @@ import { sentryVitePlugin, type SentryVitePluginOptions } from '@sentry/vite-plu
 export default defineConfig({
   plugins: [
     react(),
+    // Upload source maps to Sentry during production builds. The auth token
+    // should be provided via the `SENTRY_AUTH_TOKEN` environment variable.
     sentryVitePlugin({
       org: 'rc-sentry-projects',
       project: 'breakout-game',

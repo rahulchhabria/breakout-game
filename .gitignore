@@ -18,6 +18,7 @@ pnpm-debug.log*
 
 # Env files
 .env*
+!*.example
 
 # Tailwind CSS JIT cache
 .tailwindcss*
