@@ -10,7 +10,7 @@ Sentry.init({
   ],
   tracesSampleRate: 1.0,
   // Capture 10% of all sessions for replay plus 100% of sessions with an error
-  replaysSessionSampleRate: 0.1,
+  replaysSessionSampleRate: 1.0,
   replaysOnErrorSampleRate: 1.0,
   _experiments: { enableLogs: true },
 });
