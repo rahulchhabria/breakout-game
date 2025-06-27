@@ -5,26 +5,59 @@ Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN || 'https://fff74e528b4cafe486546e7e9898d710@o4506312335294464.ingest.us.sentry.io/4509563503640576',
   integrations: [
     Sentry.browserTracingIntegration(),
-    Sentry.replayIntegration(),
-    Sentry.consoleLoggingIntegration({ levels: ['log', 'warn', 'error'] }),
+    // Configure Session Replay with privacy settings
+    Sentry.replayIntegration({
+      // Mask all text content by default
+      maskAllText: true,
+      // Block all media elements for privacy
+      blockAllMedia: true,
+      // Add canvas recording for game state
+      networkDetailAllowUrls: [window.location.origin],
+    }),
+    // Enhanced console logging integration
+    Sentry.consoleLoggingIntegration({
+      levels: ['debug', 'info', 'warn', 'error', 'log', 'assert'],
+    }),
+    // Add canvas recording for game state
+    Sentry.replayCanvasIntegration(),
+    // Add the modern feedback widget
     Sentry.feedbackIntegration({
-      // Enable system-based color scheme
+      // Use system color scheme
       colorScheme: 'system',
-      // Enable screenshots (supported on desktop browsers)
+      // Enable screenshots on desktop browsers
       enableScreenshot: true,
+      // Customize the widget appearance
+      buttonLabel: 'Send Feedback',
+      submitButtonLabel: 'Send',
+      // Position the widget in the bottom-right corner
+      placement: 'bottom-right',
+      // Show branding
+      showBranding: true,
     }),
   ],
   tracesSampleRate: 1.0,
-  // Capture 10% of all sessions for replay plus 100% of sessions with an error
+  // Capture all sessions for replay
   replaysSessionSampleRate: 1.0,
+  // Always capture sessions when errors occur
   replaysOnErrorSampleRate: 1.0,
-  _experiments: { enableLogs: true },
-  
-  // Show feedback dialog for all unhandled errors
-  beforeSend(event) {
-    if (event.exception) {
-      Sentry.showReportDialog({ eventId: event.event_id });
-    }
-    return event;
+  _experiments: {
+    enableLogs: true,
+    // Filter out noisy logs in development
+    beforeSendLog: (log) => {
+      // Don't send debug logs in production
+      if (import.meta.env.PROD && log.level === 'debug') {
+        return null;
+      }
+      
+      // Add environment info to all logs
+      return {
+        ...log,
+        attributes: {
+          ...log.attributes,
+          environment: import.meta.env.MODE,
+          version: import.meta.env.VITE_APP_VERSION || '1.0.0',
+        },
+      };
+    },
   },
 });

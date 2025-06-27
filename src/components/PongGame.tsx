@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import * as Sentry from '@sentry/react';
+import { log } from '../utils/logger';
 
 interface Brick {
   x: number;
@@ -58,7 +59,7 @@ const CANVAS_HEIGHT = 600;
 const PADDLE_WIDTH = 120;
 const PADDLE_HEIGHT = 20;
 const BALL_SIZE = 12;
-const INITIAL_BALL_SPEED = 2.5; // Reduced from 4
+const INITIAL_BALL_SPEED = 4; // Set back to original speed
 const BRICK_WIDTH = 75;
 const BRICK_HEIGHT = 25;
 const BRICK_PADDING = 5;
@@ -188,6 +189,7 @@ export default function PongGame() {
   }, [gameState.paddleExpanded]);
 
   const startGame = () => {
+    log.info('Game started', { lives: gameState.lives, level: gameState.level });
     setGameState(prev => ({
       ...prev,
       isPlaying: true,
@@ -198,13 +200,20 @@ export default function PongGame() {
   };
 
   const pauseGame = () => {
+    const newPauseState = !gameState.isPaused;
+    log.debug('Game pause state changed', { 
+      isPaused: newPauseState,
+      score: gameState.score,
+      lives: gameState.lives 
+    });
     setGameState(prev => ({
       ...prev,
-      isPaused: !prev.isPaused,
+      isPaused: newPauseState,
     }));
   };
 
   const resetGame = () => {
+    log.info('Game reset', { finalScore: gameState.score });
     setGameState({
       balls: [{
         x: CANVAS_WIDTH / 2,
@@ -255,7 +264,16 @@ export default function PongGame() {
       }
 
       // Update balls
-      newState.balls = newState.balls.filter(ball => ball.active);
+      newState.balls = newState.balls.filter(ball => {
+        if (!ball.active) {
+          log.debug('Ball lost', { 
+            position: { x: ball.x, y: ball.y },
+            velocity: { dx: ball.dx, dy: ball.dy }
+          });
+          return false;
+        }
+        return true;
+      });
       
       newState.balls.forEach(ball => {
         const speedMultiplier = newState.slowBallTimer > 0 ? 0.3 : 1; // Reduced slow multiplier from 0.5 to 0.3
@@ -344,9 +362,17 @@ export default function PongGame() {
       // Check if all balls are gone
       if (newState.balls.length === 0) {
         newState.lives -= 1;
-        playSound(110, 300);
+        log.warn('Life lost', { 
+          remainingLives: newState.lives,
+          score: newState.score
+        });
         
         if (newState.lives <= 0) {
+          log.info('Game over', {
+            finalScore: newState.score,
+            bricksDestroyed: newState.bricks.filter(b => b.destroyed).length,
+            totalBricks: newState.bricks.length
+          });
           newState.gameOver = true;
           newState.isPlaying = false;
         } else {
@@ -375,6 +401,11 @@ export default function PongGame() {
           powerUp.x + 10 >= newState.paddle.x &&
           powerUp.x - 10 <= newState.paddle.x + newState.paddle.width
         ) {
+          log.info('Power-up collected', {
+            type: powerUp.type,
+            position: { x: powerUp.x, y: powerUp.y }
+          });
+          
           playSound(550, 200);
           
           switch (powerUp.type) {
@@ -428,6 +459,11 @@ export default function PongGame() {
       // Check win condition
       const remainingBricks = newState.bricks.filter(brick => !brick.destroyed);
       if (remainingBricks.length === 0) {
+        log.info('Game won', {
+          finalScore: newState.score,
+          lives: newState.lives,
+          powerUpsCollected: newState.powerUps.length
+        });
         newState.gameWon = true;
         newState.isPlaying = false;
         playSound(660, 500);
