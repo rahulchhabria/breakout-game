@@ -7,10 +7,24 @@ Sentry.init({
     Sentry.browserTracingIntegration(),
     Sentry.replayIntegration(),
     Sentry.consoleLoggingIntegration({ levels: ['log', 'warn', 'error'] }),
+    Sentry.feedbackIntegration({
+      // Enable system-based color scheme
+      colorScheme: 'system',
+      // Enable screenshots (supported on desktop browsers)
+      enableScreenshot: true,
+    }),
   ],
   tracesSampleRate: 1.0,
   // Capture 10% of all sessions for replay plus 100% of sessions with an error
   replaysSessionSampleRate: 1.0,
   replaysOnErrorSampleRate: 1.0,
   _experiments: { enableLogs: true },
+  
+  // Show feedback dialog for all unhandled errors
+  beforeSend(event) {
+    if (event.exception) {
+      Sentry.showReportDialog({ eventId: event.event_id });
+    }
+    return event;
+  },
 });
