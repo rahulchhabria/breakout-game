@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import { log } from '../utils/logger';
+import * as Sentry from '@sentry/react';
 
 interface Brick {
   x: number;
@@ -339,6 +340,9 @@ export default function PongGame() {
             if (brick.hits >= brick.maxHits) {
               brick.destroyed = true;
               playSound(440, 150);
+              
+              // Trigger a unique Sentry error for each brick broken
+              Sentry.captureException(new Error(`Brick broken at (${brick.x},${brick.y}) - color: ${brick.color} - points: ${brick.points} - id: ${Math.random().toString(36).substr(2, 9)}`));
               
               // Chance to drop power-up
               if (Math.random() < 0.15) {
