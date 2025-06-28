@@ -1,11 +1,17 @@
 name: Codecov
 on: [push, pull_request]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -19,17 +25,12 @@ jobs:
         run: npm run test:coverage
         if: always()
         
-      - name: Upload coverage to Codecov
+      - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: 1caa27b6-4658-40cb-96c8-8173ab8e380e
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-          
-      - name: Upload test results to Codecov
-        if: always()
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./test-results.xml
-          flags: unit-tests
-          name: Unit Tests 
+          files: ./coverage/coverage-final.json,./test-results.xml
+          flags: unittests
+          name: codecov-umbrella
+          verbose: true 
