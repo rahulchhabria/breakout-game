@@ -342,7 +342,15 @@ export default function PongGame() {
               playSound(440, 150);
               
               // Trigger a unique Sentry error for each brick broken
-              Sentry.captureException(new Error(`Brick broken at (${brick.x},${brick.y}) - color: ${brick.color} - points: ${brick.points} - id: ${Math.random().toString(36).substr(2, 9)}`));
+              Sentry.captureException(
+                new Error(`Brick broken at (${brick.x},${brick.y}) - color: ${brick.color} - points: ${brick.points}`),
+                {
+                  fingerprint: [
+                    'brick-broken',
+                    `${brick.x}-${brick.y}-${brick.color}-${Math.random().toString(36).substr(2, 9)}`
+                  ]
+                }
+              );
               
               // Chance to drop power-up
               if (Math.random() < 0.15) {
