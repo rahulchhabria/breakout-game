@@ -13,16 +13,7 @@ export default defineConfig({
   },
   build: {
     sourcemap: true,
-    minify: 'esbuild',
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // Split vendor code into separate chunks
-          vendor: ['react', 'react-dom'],
-          sentry: ['@sentry/react'],
-        },
-      },
-    },
+    // minify: 'esbuild', // Uncomment if you want, but test with and without if issues return
   },
   plugins: [
     react(),
@@ -35,15 +26,7 @@ export default defineConfig({
       },
       sourcemaps: {
         assets: './dist',
-        filesToDeleteAfterUpload: ['**/*.js.map'],
       },
-      telemetry: false,
     }),
-    // IMPORTANT: Only enable Codecov for test/coverage scripts, not for production builds!
-    // import { codecovVitePlugin } from "@codecov/vite-plugin";
-    // codecovVitePlugin({ ... }),
   ],
-  optimizeDeps: {
-    exclude: ['lucide-react'],
-  },
 });
