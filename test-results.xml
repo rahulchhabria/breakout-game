@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="1" failures="0" errors="0" time="0.832">
+    <testsuite name="src/components/PongGame.test.tsx" timestamp="2025-06-28T03:33:43.304Z" hostname="QX9GXT06DL.local" tests="1" failures="0" errors="0" skipped="0" time="0.024">
+        <testcase classname="src/components/PongGame.test.tsx" name="PongGame &gt; renders the game title" time="0.023">
+        </testcase>
+    </testsuite>
+</testsuites>
