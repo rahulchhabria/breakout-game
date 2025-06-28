@@ -1,0 +1,40 @@
+name: Codecov
+on: [push, pull_request]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.19.0'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        if: always()
+        
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: 1caa27b6-4658-40cb-96c8-8173ab8e380e
+          CODECOV_ORG_TOKEN: 1caa27b6-4658-40cb-96c8-8173ab8e380e
+        with:
+          token: 1caa27b6-4658-40cb-96c8-8173ab8e380e
+          files: ./coverage/coverage-final.json,./test-results.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+          verbose: true
+          codecov_yml_path: .codecov.yml 

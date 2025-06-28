@@ -2,6 +2,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { sentryVitePlugin, type SentryVitePluginOptions } from '@sentry/vite-plugin';
+import { codecovVitePlugin } from "@codecov/vite-plugin";
 import { version } from './package.json';
 
 // https://vitejs.dev/config/
@@ -49,6 +50,13 @@ export default defineConfig(({ mode }) => {
         },
         telemetry: false, // Disable Sentry telemetry
       } satisfies SentryVitePluginOptions),
+      // Add Codecov bundle analysis plugin
+      codecovVitePlugin({
+        enableBundleAnalysis: true,
+        bundleName: "breakout-game",
+        uploadToken: env.CODECOV_TOKEN || '1caa27b6-4658-40cb-96c8-8173ab8e380e',
+        telemetry: false, // Disable telemetry
+      }),
     ],
     optimizeDeps: {
       exclude: ['lucide-react'],

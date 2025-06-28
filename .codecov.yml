@@ -1,0 +1,29 @@
+codecov:
+  token: 1caa27b6-4658-40cb-96c8-8173ab8e380e
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 0%
+        base: auto
+    patch:
+      default:
+        target: auto
+        threshold: 0%
+        base: auto
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+  hide_project_coverage: false
+
+ignore:
+  - "**/*.test.{ts,tsx}"
+  - "**/*.spec.{ts,tsx}"
+  - "vite.config.ts"
+  - "vitest.config.ts" 
