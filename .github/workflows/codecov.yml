@@ -29,8 +29,12 @@ jobs:
         uses: codecov/codecov-action@v4
         env:
           CODECOV_TOKEN: 1caa27b6-4658-40cb-96c8-8173ab8e380e
+          CODECOV_ORG_TOKEN: 1caa27b6-4658-40cb-96c8-8173ab8e380e
         with:
+          token: 1caa27b6-4658-40cb-96c8-8173ab8e380e
           files: ./coverage/coverage-final.json,./test-results.xml
           flags: unittests
           name: codecov-umbrella
-          verbose: true 
+          fail_ci_if_error: true
+          verbose: true
+          codecov_yml_path: .codecov.yml 
