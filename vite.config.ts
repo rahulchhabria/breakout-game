@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => {
     define: {
       // Inject version at build time
       __APP_VERSION__: JSON.stringify(version),
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(process.env.npm_package_version),
     },
     build: {
       sourcemap: true,
@@ -34,15 +35,9 @@ export default defineConfig(({ mode }) => {
       sentryVitePlugin({
         org: 'rc-sentry-projects',
         project: 'breakout-game',
-        authToken: env.SENTRY_AUTH_TOKEN,
+        authToken: process.env.SENTRY_AUTH_TOKEN,
         release: {
-          name: version,
-          setCommits: {
-            auto: true
-          },
-          deploy: {
-            env: mode
-          }
+          name: process.env.npm_package_version,
         },
         sourcemaps: {
           assets: './dist',
