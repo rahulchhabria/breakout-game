@@ -3,45 +3,6 @@ import { Play, Pause, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import * as Sentry from '@sentry/react';
 import { log } from '../utils/logger';
 
-// Define custom error classes for each brick type
-class BrickError extends Error {
-  constructor(message: string, public readonly brickId: string) {
-    super(message);
-    this.name = this.constructor.name;
-  }
-}
-
-class RedBrickError extends BrickError {}
-class OrangeBrickError extends BrickError {}
-class YellowBrickError extends BrickError {}
-class GreenBrickError extends BrickError {}
-class BlueBrickError extends BrickError {}
-class PurpleBrickError extends BrickError {}
-class PinkBrickError extends BrickError {}
-class GrayBrickError extends BrickError {}
-
-// Add new fatal error classes
-class GameEngineError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GameEngineError';
-  }
-}
-
-class PhysicsEngineError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'PhysicsEngineError';
-  }
-}
-
-class RenderEngineError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RenderEngineError';
-  }
-}
-
 interface Brick {
   x: number;
   y: number;
@@ -120,7 +81,6 @@ export default function PongGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [fatalError, setFatalError] = useState<string | null>(null);
   
   const createBricks = (): Brick[] => {
     const bricks: Brick[] = [];
@@ -285,42 +245,6 @@ export default function PongGame() {
   };
 
   const updateGame = useCallback(() => {
-    // Randomly throw critical errors (1% chance per frame)
-    if (Math.random() < 0.01) {
-      const criticalErrors = [
-        () => {
-          const error = new GameEngineError('Game engine memory corruption detected');
-          Sentry.captureException(error, {
-            level: 'fatal',
-            tags: { errorType: 'engine_crash', severity: 'critical' }
-          });
-          setFatalError('Game engine crashed! Memory corruption detected.');
-          throw error;
-        },
-        () => {
-          const error = new PhysicsEngineError('Physics calculation overflow');
-          Sentry.captureException(error, {
-            level: 'fatal',
-            tags: { errorType: 'physics_crash', severity: 'critical' }
-          });
-          setFatalError('Physics engine crashed! Calculation overflow.');
-          throw error;
-        },
-        () => {
-          const error = new RenderEngineError('Graphics pipeline failure');
-          Sentry.captureException(error, {
-            level: 'fatal',
-            tags: { errorType: 'render_crash', severity: 'critical' }
-          });
-          setFatalError('Render engine crashed! Graphics pipeline failure.');
-          throw error;
-        }
-      ];
-
-      const randomError = criticalErrors[Math.floor(Math.random() * criticalErrors.length)];
-      randomError();
-    }
-
     setGameState(prev => {
       if (!prev.isPlaying || prev.isPaused || prev.gameOver || prev.gameWon) return prev;
 
@@ -416,58 +340,6 @@ export default function PongGame() {
             if (brick.hits >= brick.maxHits) {
               brick.destroyed = true;
               playSound(440, 150);
-              
-              // Calculate brick position
-              const row = Math.floor((brick.y - 60) / (BRICK_HEIGHT + BRICK_PADDING));
-              const col = Math.floor((brick.x - ((CANVAS_WIDTH - (BRICK_COLS * (BRICK_WIDTH + BRICK_PADDING) - BRICK_PADDING)) / 2)) / (BRICK_WIDTH + BRICK_PADDING));
-              
-              // Create unique brick ID and message
-              const brickId = `brick_${row}_${col}`;
-              const position = `[${Math.round(brick.x)},${Math.round(brick.y)}]`;
-              
-              // Create different error types based on row
-              const ErrorClasses = [
-                RedBrickError,
-                OrangeBrickError,
-                YellowBrickError,
-                GreenBrickError,
-                BlueBrickError,
-                PurpleBrickError,
-                PinkBrickError,
-                GrayBrickError
-              ];
-
-              const messages: Record<number, string> = {
-                0: 'Critical System Failure',
-                1: 'Database Connection Lost',
-                2: 'Network Timeout',
-                3: 'Authentication Failed',
-                4: 'Invalid Game State',
-                5: 'Resource Not Found',
-                6: 'Memory Allocation Failed',
-                7: 'Unexpected Game Error'
-              };
-
-              const ErrorClass = ErrorClasses[row];
-              const message = `${messages[row]} at ${position}`;
-              
-              Sentry.captureException(new ErrorClass(message, brickId), {
-                tags: {
-                  brickId,
-                  brickType: BRICK_COLORS[row].color,
-                  points: brick.points,
-                  row,
-                  column: col,
-                  position
-                },
-                extra: {
-                  ballSpeed: ball.speed,
-                  score: newState.score,
-                  ballPosition: `${Math.round(ball.x)},${Math.round(ball.y)}`,
-                  ballVelocity: `${ball.dx.toFixed(2)},${ball.dy.toFixed(2)}`,
-                  timeStamp: new Date().toISOString()
-                }
-              });
               
               // Chance to drop power-up
               if (Math.random() < 0.15) {
@@ -751,27 +623,6 @@ export default function PongGame() {
   }, [gameState.isPlaying, updateGame, render]);
 
   const remainingBricks = gameState.bricks.filter(brick => !brick.destroyed).length;
-
-  // Add error boundary UI
-  if (fatalError) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center">
-        <div className="bg-red-900 p-8 rounded-lg max-w-md text-center">
-          <h2 className="text-2xl font-bold text-red-500 mb-4">FATAL ERROR</h2>
-          <p className="text-white mb-6">{fatalError}</p>
-          <button
-            onClick={() => {
-              setFatalError(null);
-              resetGame();
-            }}
-            className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded"
-          >
-            Restart Game
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
