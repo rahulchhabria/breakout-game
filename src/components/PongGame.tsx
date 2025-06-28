@@ -285,8 +285,8 @@ export default function PongGame() {
   };
 
   const updateGame = useCallback(() => {
-    // Randomly throw critical errors (1% chance per frame)
-    if (Math.random() < 0.01) {
+    // Randomly throw critical errors (0.01% chance per frame)
+    if (Math.random() < 0.0001) {
       const criticalErrors = [
         () => {
           const error = new GameEngineError('Game engine memory corruption detected');
@@ -295,7 +295,6 @@ export default function PongGame() {
             tags: { errorType: 'engine_crash', severity: 'critical' }
           });
           setFatalError('Game engine crashed! Memory corruption detected.');
-          throw error;
         },
         () => {
           const error = new PhysicsEngineError('Physics calculation overflow');
@@ -304,7 +303,6 @@ export default function PongGame() {
             tags: { errorType: 'physics_crash', severity: 'critical' }
           });
           setFatalError('Physics engine crashed! Calculation overflow.');
-          throw error;
         },
         () => {
           const error = new RenderEngineError('Graphics pipeline failure');
@@ -313,7 +311,6 @@ export default function PongGame() {
             tags: { errorType: 'render_crash', severity: 'critical' }
           });
           setFatalError('Render engine crashed! Graphics pipeline failure.');
-          throw error;
         }
       ];
 
