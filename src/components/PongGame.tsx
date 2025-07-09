@@ -347,7 +347,7 @@ export default function PongGame() {
                 {
                   fingerprint: [
                     'brick-broken',
-                    `${brick.x}-${brick.y}-${brick.color}-${Math.random().toString(36).substr(2, 9)}`
+                    brick.color // Group by color only
                   ]
                 }
               );
