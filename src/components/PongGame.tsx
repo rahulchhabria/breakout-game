@@ -13,6 +13,8 @@ interface Brick {
   hits: number;
   maxHits: number;
   destroyed: boolean;
+  powerType?: 'bonus' | 'trap' | null;
+  powerEffect?: string | null;
 }
 
 interface PowerUp {
@@ -77,10 +79,27 @@ const BRICK_COLORS = [
   { color: '#6b7280', points: 10, hits: 1 }, // Gray - reduced from 3 hits to 1
 ];
 
+const BONUS_EFFECTS = [
+  { effect: 'extra-life', icon: '⭐', label: 'Extra Life' },
+  { effect: 'expand-paddle', icon: '⬆️', label: 'Expand Paddle' },
+  { effect: 'multiball', icon: '💥', label: 'Multi-ball' },
+  { effect: 'score-boost', icon: '💰', label: 'Score Boost' },
+];
+const TRAP_EFFECTS = [
+  { effect: 'shrink-paddle', icon: '⬇️', label: 'Shrink Paddle' },
+  { effect: 'reverse-controls', icon: '🔄', label: 'Reverse Controls' },
+  { effect: 'lose-life', icon: '💔', label: 'Lose a Life' },
+  { effect: 'speed-up', icon: '⚡', label: 'Speed Up Ball' },
+  { effect: 'slow-span', icon: '🐢', label: 'Slow Sentry Span' }, // NEW
+];
+
 export default function PongGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [initials, setInitials] = useState('');
+  const [showInitialsPrompt, setShowInitialsPrompt] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<{ initials: string; score: number }[]>([]);
   
   const createBricks = (): Brick[] => {
     const bricks: Brick[] = [];
@@ -90,6 +109,22 @@ export default function PongGame() {
     for (let row = 0; row < BRICK_ROWS; row++) {
       for (let col = 0; col < BRICK_COLS; col++) {
         const brickType = BRICK_COLORS[row] || BRICK_COLORS[BRICK_COLORS.length - 1];
+        // Randomly assign powerType and effect
+        let powerType: 'bonus' | 'trap' | null = null;
+        let powerEffect: string | null = null;
+        let icon: string | null = null;
+        const rand = Math.random();
+        if (rand < 0.1) { // 10% chance bonus
+          powerType = 'bonus';
+          const bonus = BONUS_EFFECTS[Math.floor(Math.random() * BONUS_EFFECTS.length)];
+          powerEffect = bonus.effect;
+          icon = bonus.icon;
+        } else if (rand < 0.2) { // 10% chance trap
+          powerType = 'trap';
+          const trap = TRAP_EFFECTS[Math.floor(Math.random() * TRAP_EFFECTS.length)];
+          powerEffect = trap.effect;
+          icon = trap.icon;
+        }
         bricks.push({
           x: startX + col * (BRICK_WIDTH + BRICK_PADDING),
           y: startY + row * (BRICK_HEIGHT + BRICK_PADDING),
@@ -100,7 +135,10 @@ export default function PongGame() {
           hits: 0,
           maxHits: brickType.hits,
           destroyed: false,
-        });
+          powerType,
+          powerEffect,
+          icon,
+        } as Brick & { icon?: string });
       }
     }
     return bricks;
@@ -351,6 +389,14 @@ export default function PongGame() {
                   ]
                 }
               );
+
+              // Handle trap/bonus effects
+              if (brick.powerType === 'trap' && brick.powerEffect === 'slow-span') {
+                Sentry.startSpan({ name: 'intentional-slow-span' }, () => {
+                  const start = Date.now();
+                  while (Date.now() - start < 2000) {}
+                });
+              }
               
               // Chance to drop power-up
               if (Math.random() < 0.15) {
@@ -511,23 +557,41 @@ export default function PongGame() {
         // Brick damage effect
         const alpha = 1 - (brick.hits / brick.maxHits) * 0.5;
         ctx.globalAlpha = alpha;
-        
+
+        // Special color for bonus/trap bricks
+        let brickColor = brick.color;
+        if (brick.powerType === 'bonus') {
+          brickColor = '#facc15'; // Gold/yellow for bonus
+        } else if (brick.powerType === 'trap') {
+          brickColor = '#ef4444'; // Red for trap
+        }
+
         // Brick gradient
         const brickGradient = ctx.createLinearGradient(
           brick.x, brick.y,
           brick.x, brick.y + brick.height
         );
-        brickGradient.addColorStop(0, brick.color);
-        brickGradient.addColorStop(1, brick.color + '80');
-        
+        brickGradient.addColorStop(0, brickColor);
+        brickGradient.addColorStop(1, brickColor + '80');
+
         ctx.fillStyle = brickGradient;
         ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
-        
+
         // Brick border
-        ctx.strokeStyle = brick.color;
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = brickColor;
+        ctx.lineWidth = 2;
         ctx.strokeRect(brick.x, brick.y, brick.width, brick.height);
-        
+
+        // Draw icon for bonus/trap
+        if (brick.powerType && (brick as any).icon) {
+          ctx.globalAlpha = 1;
+          ctx.font = '20px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = brick.powerType === 'bonus' ? '#fffde4' : '#ffb4b4';
+          ctx.fillText((brick as any).icon, brick.x + brick.width / 2, brick.y + brick.height / 2);
+        }
+
         ctx.globalAlpha = 1;
       });
 
@@ -633,185 +697,264 @@ export default function PongGame() {
     };
   }, [gameState.isPlaying, updateGame, render]);
 
+  // Load leaderboard from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('breakout-leaderboard');
+    if (stored) setLeaderboard(JSON.parse(stored));
+  }, []);
+
+  // Show initials prompt after game over or victory
+  useEffect(() => {
+    if ((gameState.gameOver || gameState.gameWon) && (gameState.score > 0)) {
+      setShowInitialsPrompt(true);
+    }
+  }, [gameState.gameOver, gameState.gameWon]);
+
+  // Save to leaderboard
+  const saveToLeaderboard = () => {
+    if (!initials.trim()) return;
+    const entry = { initials: initials.trim().toUpperCase().slice(0, 3), score: gameState.score };
+    const updated = [...leaderboard, entry].sort((a, b) => b.score - a.score).slice(0, 10);
+    setLeaderboard(updated);
+    localStorage.setItem('breakout-leaderboard', JSON.stringify(updated));
+    setShowInitialsPrompt(false);
+    setInitials('');
+  };
+
   const remainingBricks = gameState.bricks.filter(brick => !brick.destroyed).length;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
-      <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-purple-500/20">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="text-white">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              BREAKOUT
-            </h1>
-            <p className="text-sm text-gray-400">Destroy all the bricks!</p>
-          </div>
-          
-          <div className="flex items-center gap-4 text-white">
-            <div className="text-right">
-              <div className="text-sm text-gray-400">Score</div>
-              <div className="text-2xl font-bold text-blue-400">{gameState.score}</div>
+      <div className="flex flex-row gap-8">
+        <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-purple-500/20">
+          {/* Header */}
+          <div className="flex justify-between items-center mb-4">
+            <div className="text-white">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                BREAKOUT
+              </h1>
+              <p className="text-sm text-gray-400">Destroy all the bricks!</p>
             </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-400">Bricks</div>
-              <div className="text-2xl font-bold text-purple-400">{remainingBricks}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-400">Lives</div>
-              <div className="text-2xl font-bold text-red-400">
-                {'❤️'.repeat(gameState.lives)}
+            
+            <div className="flex items-center gap-4 text-white">
+              <div className="text-right">
+                <div className="text-sm text-gray-400">Score</div>
+                <div className="text-2xl font-bold text-blue-400">{gameState.score}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm text-gray-400">Bricks</div>
+                <div className="text-2xl font-bold text-purple-400">{remainingBricks}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm text-gray-400">Lives</div>
+                <div className="text-2xl font-bold text-red-400">
+                  {'❤️'.repeat(gameState.lives)}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Power-up indicators */}
-        {(gameState.paddleExpanded || gameState.slowBallTimer > 0) && (
-          <div className="flex gap-2 mb-4 justify-center">
-            {gameState.paddleExpanded && (
-              <div className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm">
-                Expanded Paddle ({Math.ceil(gameState.expandTimer / 60)}s)
-              </div>
-            )}
-            {gameState.slowBallTimer > 0 && (
-              <div className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-sm">
-                Slow Ball ({Math.ceil(gameState.slowBallTimer / 60)}s)
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Game Canvas */}
-        <div className="relative">
-          <canvas
-            ref={canvasRef}
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
-            className="border-2 border-purple-500/30 rounded-lg shadow-2xl cursor-none"
-          />
-          
-          {/* Game Over Overlay */}
-          {gameState.gameOver && (
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
-              <div className="text-center text-white">
-                <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
-                  Game Over
-                </h2>
-                <p className="text-xl mb-2">Final Score: <span className="text-blue-400 font-bold">{gameState.score}</span></p>
-                <p className="text-lg mb-6">Bricks Destroyed: <span className="text-purple-400 font-bold">{gameState.bricks.length - remainingBricks}</span></p>
-                <button
-                  onClick={resetGame}
-                  className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105"
-                >
-                  Play Again
-                </button>
-              </div>
+          {/* Power-up indicators */}
+          {(gameState.paddleExpanded || gameState.slowBallTimer > 0) && (
+            <div className="flex gap-2 mb-4 justify-center">
+              {gameState.paddleExpanded && (
+                <div className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm">
+                  Expanded Paddle ({Math.ceil(gameState.expandTimer / 60)}s)
+                </div>
+              )}
+              {gameState.slowBallTimer > 0 && (
+                <div className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-sm">
+                  Slow Ball ({Math.ceil(gameState.slowBallTimer / 60)}s)
+                </div>
+              )}
             </div>
           )}
 
-          {/* Victory Overlay */}
-          {gameState.gameWon && (
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
-              <div className="text-center text-white">
-                <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-yellow-400 to-green-400 bg-clip-text text-transparent">
-                  Victory!
-                </h2>
-                <p className="text-xl mb-2">Final Score: <span className="text-blue-400 font-bold">{gameState.score}</span></p>
-                <p className="text-lg mb-6">All bricks destroyed!</p>
-                <button
-                  onClick={resetGame}
-                  className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105"
-                >
-                  Play Again
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Game Canvas */}
+          <div className="relative">
+            <canvas
+              ref={canvasRef}
+              width={CANVAS_WIDTH}
+              height={CANVAS_HEIGHT}
+              className="border-2 border-purple-500/30 rounded-lg shadow-2xl cursor-none"
+            />
 
-          {/* Start Screen */}
-          {!gameState.isPlaying && !gameState.gameOver && !gameState.gameWon && (
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
-              <div className="text-center text-white">
-                <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                  Ready to Break Out?
-                </h2>
-                <p className="text-lg mb-6 text-gray-300">Move your mouse to control the paddle • Destroy all bricks to win!</p>
+            {/* Initials Prompt Overlay */}
+            {showInitialsPrompt && (
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center z-20">
+                <div className="text-center text-white">
+                  <h2 className="text-2xl font-bold mb-4">Enter Your Initials</h2>
+                  <input
+                    type="text"
+                    maxLength={3}
+                    value={initials}
+                    onChange={e => setInitials(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase())}
+                    className="text-black text-2xl px-4 py-2 rounded mb-4 w-24 text-center"
+                    autoFocus
+                  />
+                  <div className="flex gap-4 justify-center">
+                    <button
+                      onClick={saveToLeaderboard}
+                      className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 px-6 py-2 rounded-lg font-semibold text-lg transition-all duration-200 transform hover:scale-105"
+                      disabled={!initials.trim()}
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => { setShowInitialsPrompt(false); setInitials(''); }}
+                      className="bg-gray-600 hover:bg-gray-700 px-6 py-2 rounded-lg font-semibold text-lg transition-all duration-200 transform hover:scale-105"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Game Over Overlay */}
+            {gameState.gameOver && !showInitialsPrompt && (
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
+                <div className="text-center text-white">
+                  <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
+                    Game Over
+                  </h2>
+                  <p className="text-xl mb-2">Final Score: <span className="text-blue-400 font-bold">{gameState.score}</span></p>
+                  <p className="text-lg mb-6">Bricks Destroyed: <span className="text-purple-400 font-bold">{gameState.bricks.length - remainingBricks}</span></p>
+                  <button
+                    onClick={resetGame}
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105"
+                  >
+                    Play Again
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Victory Overlay */}
+            {gameState.gameWon && !showInitialsPrompt && (
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
+                <div className="text-center text-white">
+                  <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-yellow-400 to-green-400 bg-clip-text text-transparent">
+                    Victory!
+                  </h2>
+                  <p className="text-xl mb-2">Final Score: <span className="text-blue-400 font-bold">{gameState.score}</span></p>
+                  <p className="text-lg mb-6">All bricks destroyed!</p>
+                  <button
+                    onClick={resetGame}
+                    className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105"
+                  >
+                    Play Again
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Start Screen */}
+            {!gameState.isPlaying && !gameState.gameOver && !gameState.gameWon && (
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
+                <div className="text-center text-white">
+                  <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                    Ready to Break Out?
+                  </h2>
+                  <p className="text-lg mb-6 text-gray-300">Move your mouse to control the paddle • Destroy all bricks to win!</p>
+                  <button
+                    onClick={startGame}
+                    className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-200 transform hover:scale-105"
+                  >
+                    Start Game
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Pause Overlay */}
+            {gameState.isPaused && gameState.isPlaying && (
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
+                <div className="text-center text-white">
+                  <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                    Paused
+                  </h2>
+                  <button
+                    onClick={pauseGame}
+                    className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105"
+                  >
+                    Resume
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Controls */}
+          <div className="flex justify-between items-center mt-4">
+            <div className="flex gap-2">
+              {!gameState.isPlaying || gameState.gameOver || gameState.gameWon ? (
                 <button
                   onClick={startGame}
-                  className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 px-8 py-4 rounded-lg font-semibold text-lg transition-all duration-200 transform hover:scale-105"
+                  className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
                 >
-                  Start Game
+                  <Play size={16} />
+                  {gameState.gameOver || gameState.gameWon ? 'New Game' : 'Start'}
                 </button>
-              </div>
-            </div>
-          )}
-
-          {/* Pause Overlay */}
-          {gameState.isPaused && gameState.isPlaying && (
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm rounded-lg flex items-center justify-center">
-              <div className="text-center text-white">
-                <h2 className="text-4xl font-bold mb-6 bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                  Paused
-                </h2>
+              ) : (
                 <button
                   onClick={pauseGame}
-                  className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 px-6 py-3 rounded-lg font-semibold transition-all duration-200 transform hover:scale-105"
+                  className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-colors"
                 >
-                  Resume
+                  <Pause size={16} />
+                  {gameState.isPaused ? 'Resume' : 'Pause'}
                 </button>
-              </div>
+              )}
+              
+              <button
+                onClick={resetGame}
+                className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                <RotateCcw size={16} />
+                Reset
+              </button>
             </div>
-          )}
-        </div>
 
-        {/* Controls */}
-        <div className="flex justify-between items-center mt-4">
-          <div className="flex gap-2">
-            {!gameState.isPlaying || gameState.gameOver || gameState.gameWon ? (
-              <button
-                onClick={startGame}
-                className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                <Play size={16} />
-                {gameState.gameOver || gameState.gameWon ? 'New Game' : 'Start'}
-              </button>
-            ) : (
-              <button
-                onClick={pauseGame}
-                className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                <Pause size={16} />
-                {gameState.isPaused ? 'Resume' : 'Pause'}
-              </button>
-            )}
-            
             <button
-              onClick={resetGame}
-              className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
             >
-              <RotateCcw size={16} />
-              Reset
+              {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              {soundEnabled ? 'Sound On' : 'Sound Off'}
             </button>
           </div>
 
-          <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-            {soundEnabled ? 'Sound On' : 'Sound Off'}
-          </button>
+          {/* Instructions */}
+          <div className="mt-4 text-center text-gray-400 text-sm">
+            <p>Move your mouse to control the paddle • Destroy all bricks to win • Collect power-ups for special abilities!</p>
+            <p className="mt-1">
+              <span className="text-yellow-400">↔</span> Expand Paddle • 
+              <span className="text-green-400 ml-2">●</span> Multi-ball • 
+              <span className="text-blue-400 ml-2">⏱</span> Slow Ball • 
+              <span className="text-red-400 ml-2">♥</span> Extra Life
+            </p>
+          </div>
         </div>
-
-        {/* Instructions */}
-        <div className="mt-4 text-center text-gray-400 text-sm">
-          <p>Move your mouse to control the paddle • Destroy all bricks to win • Collect power-ups for special abilities!</p>
-          <p className="mt-1">
-            <span className="text-yellow-400">↔</span> Expand Paddle • 
-            <span className="text-green-400 ml-2">●</span> Multi-ball • 
-            <span className="text-blue-400 ml-2">⏱</span> Slow Ball • 
-            <span className="text-red-400 ml-2">♥</span> Extra Life
-          </p>
+        {/* Leaderboard Sidebar */}
+        <div className="bg-black/40 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-yellow-400/30 min-w-[220px] max-w-[260px] flex flex-col items-center h-fit self-start">
+          <h3 className="text-2xl font-bold mb-4 text-yellow-400">Leaderboard</h3>
+          <div className="flex justify-between w-full mb-2 px-1">
+            <span className="font-mono text-gray-300 w-6"></span>
+            <span className="font-mono text-gray-300 flex-1 text-center">Initials</span>
+            <span className="font-mono text-gray-300 w-10 text-right">Score</span>
+          </div>
+          <ol className="text-lg w-full">
+            {Array.from({ length: 10 }).map((_, i) => {
+              const entry = leaderboard[i];
+              return (
+                <li key={i} className="mb-2 flex justify-between">
+                  <span className="font-mono text-gray-400 w-6">{i + 1}.</span>
+                  <span className="font-mono text-white flex-1 text-center">{entry ? entry.initials : ''}</span>
+                  <span className="font-bold text-blue-300 w-10 text-right">{entry ? entry.score : ''}</span>
+                </li>
+              );
+            })}
+          </ol>
         </div>
       </div>
     </div>
