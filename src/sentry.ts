@@ -4,6 +4,8 @@ import * as Sentry from '@sentry/react';
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN || 'https://fff74e528b4cafe486546e7e9898d710@o4506312335294464.ingest.us.sentry.io/4509563503640576',
   release: import.meta.env.VITE_APP_VERSION || '1.0.0',
+  environment: import.meta.env.MODE, // <-- Add this line
+  debug: true, // <-- Add this line for verbose SDK logging
   integrations: [
     Sentry.browserTracingIntegration(),
     // Configure Session Replay with privacy settings
