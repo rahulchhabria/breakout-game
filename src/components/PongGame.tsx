@@ -583,13 +583,13 @@ export default function PongGame() {
         ctx.strokeRect(brick.x, brick.y, brick.width, brick.height);
 
         // Draw icon for bonus/trap
-        if (brick.powerType && (brick as any).icon) {
+        if (brick.powerType && typeof (brick as { icon?: unknown }).icon === 'string') {
           ctx.globalAlpha = 1;
           ctx.font = '20px Arial';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillStyle = brick.powerType === 'bonus' ? '#fffde4' : '#ffb4b4';
-          ctx.fillText((brick as any).icon, brick.x + brick.width / 2, brick.y + brick.height / 2);
+          ctx.fillText((brick as { icon?: string }).icon!, brick.x + brick.width / 2, brick.y + brick.height / 2);
         }
 
         ctx.globalAlpha = 1;
@@ -697,6 +697,32 @@ export default function PongGame() {
     };
   }, [gameState.isPlaying, updateGame, render]);
 
+  // Touch controls for mobile (if not already present)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const handleTouch = (e: TouchEvent) => {
+      if (!gameState.isPlaying || gameState.isPaused || gameState.gameOver || gameState.gameWon) return;
+      const rect = canvas.getBoundingClientRect();
+      const touch = e.touches[0];
+      const scaleX = canvas.width / rect.width;
+      const touchX = (touch.clientX - rect.left) * scaleX;
+      const paddleWidth = gameState.paddleExpanded ? PADDLE_WIDTH * 1.5 : PADDLE_WIDTH;
+      const paddleX = Math.max(0, Math.min(CANVAS_WIDTH - paddleWidth, touchX - paddleWidth / 2));
+      setGameState(prev => ({
+        ...prev,
+        paddle: { ...prev.paddle, x: paddleX, width: paddleWidth },
+      }));
+      e.preventDefault();
+    };
+    canvas.addEventListener('touchstart', handleTouch, { passive: false });
+    canvas.addEventListener('touchmove', handleTouch, { passive: false });
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouch);
+      canvas.removeEventListener('touchmove', handleTouch);
+    };
+  }, [gameState.isPlaying, gameState.isPaused, gameState.gameOver, gameState.gameWon, gameState.paddleExpanded]);
+
   // Load leaderboard from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('breakout-leaderboard');
@@ -724,9 +750,9 @@ export default function PongGame() {
   const remainingBricks = gameState.bricks.filter(brick => !brick.destroyed).length;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
-      <div className="flex flex-row gap-8">
-        <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-purple-500/20">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-2 sm:p-4 min-w-0">
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 w-full max-w-[900px] mx-auto">
+        <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-2 sm:p-6 shadow-2xl border border-purple-500/20 w-full sm:w-auto">
           {/* Header */}
           <div className="flex justify-between items-center mb-4">
             <div className="text-white">
@@ -776,7 +802,8 @@ export default function PongGame() {
               ref={canvasRef}
               width={CANVAS_WIDTH}
               height={CANVAS_HEIGHT}
-              className="border-2 border-purple-500/30 rounded-lg shadow-2xl cursor-none"
+              style={{ width: '100%', maxWidth: 800, height: 'auto', aspectRatio: '4/3', touchAction: 'none' }}
+              className="border-2 border-purple-500/30 rounded-lg shadow-2xl select-none"
             />
 
             {/* Initials Prompt Overlay */}
@@ -936,7 +963,7 @@ export default function PongGame() {
           </div>
         </div>
         {/* Leaderboard Sidebar */}
-        <div className="bg-black/40 backdrop-blur-lg rounded-2xl p-6 shadow-2xl border border-yellow-400/30 min-w-[220px] max-w-[260px] flex flex-col items-center h-fit self-start">
+        <div className="bg-black/40 backdrop-blur-lg rounded-2xl p-2 sm:p-6 shadow-2xl border border-yellow-400/30 min-w-0 w-full sm:min-w-[220px] sm:max-w-[260px] flex flex-col items-center h-fit self-start mt-4 sm:mt-0">
           <h3 className="text-2xl font-bold mb-4 text-yellow-400">Leaderboard</h3>
           <div className="flex justify-between w-full mb-2 px-1">
             <span className="font-mono text-gray-300 w-6"></span>
