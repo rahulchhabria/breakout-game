@@ -44,23 +44,6 @@ Sentry.init({
   // Always capture sessions when errors occur
   replaysOnErrorSampleRate: 1.0,
   _experiments: {
-    enableLogs: true,
-    // Filter out noisy logs in development
-    beforeSendLog: (log) => {
-      // Don't send debug logs in production
-      if (import.meta.env.PROD && log.level === 'debug') {
-        return null;
-      }
-      
-      // Add environment info to all logs
-      return {
-        ...log,
-        attributes: {
-          ...log.attributes,
-          environment: import.meta.env.MODE,
-          version: import.meta.env.VITE_APP_VERSION || '1.0.0',
-        },
-      };
-    },
+    enableLogs: true,    // Filter out noisy logs in development
   },
 });
