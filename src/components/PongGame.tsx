@@ -216,7 +216,8 @@ export default function PongGame() {
     if (!canvas) return;
     
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
+    const scaleX = canvas.width / rect.width;
+    const mouseX = (e.clientX - rect.left) * scaleX;
     const paddleWidth = gameState.paddleExpanded ? PADDLE_WIDTH * 1.5 : PADDLE_WIDTH;
     const paddleX = Math.max(0, Math.min(CANVAS_WIDTH - paddleWidth, mouseX - paddleWidth / 2));
     
