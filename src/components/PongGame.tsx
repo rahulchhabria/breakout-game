@@ -379,27 +379,7 @@ export default function PongGame() {
             if (brick.hits >= brick.maxHits) {
               brick.destroyed = true;
               playSound(440, 150);
-              // Add recent logs as breadcrumbs before capturing exception
-              getRecentLogs().forEach(logEntry => {
-                Sentry.addBreadcrumb({
-                  category: 'log',
-                  message: logEntry.message,
-                  level: logEntry.level,
-                  data: logEntry.attributes,
-                  timestamp: Math.floor(logEntry.timestamp / 1000),
-                });
-              });
-              // Trigger a unique Sentry error for each brick broken
-              Sentry.captureException(
-                new Error(`Brick broken at (${brick.x},${brick.y}) - color: ${brick.color} - points: ${brick.points}`),
-                {
-                  fingerprint: [
-                    'brick-broken',
-                    brick.color // Group by color only
-                  ]
-                }
-              );
-
+              
               // Handle trap/bonus effects
               if (brick.powerType === 'trap' && brick.powerEffect === 'slow-span') {
                 Sentry.startSpan({ name: 'intentional-slow-span' }, () => {
