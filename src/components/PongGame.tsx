@@ -764,7 +764,7 @@ export default function PongGame() {
               <div className="text-right">
                 <div className="text-sm text-gray-400">Lives</div>
                 <div className="text-2xl font-bold text-red-400">
-                  {'❤️'.repeat(gameState.lives)}
+                  {'❤️'.repeat(Math.max(0, gameState.lives))}
                 </div>
               </div>
             </div>
