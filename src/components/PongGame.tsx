@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX } from 'lucide-react';
-import { log, getRecentLogs } from '../utils/logger';
+import { log } from '../utils/logger';
 import * as Sentry from '@sentry/react';
 
 interface Brick {
@@ -379,26 +379,12 @@ export default function PongGame() {
             if (brick.hits >= brick.maxHits) {
               brick.destroyed = true;
               playSound(440, 150);
-              // Add recent logs as breadcrumbs before capturing exception
-              getRecentLogs().forEach(logEntry => {
-                Sentry.addBreadcrumb({
-                  category: 'log',
-                  message: logEntry.message,
-                  level: logEntry.level,
-                  data: logEntry.attributes,
-                  timestamp: Math.floor(logEntry.timestamp / 1000),
-                });
+              Sentry.addBreadcrumb({
+                category: 'game.brick',
+                message: `Brick broken at (${brick.x},${brick.y})`,
+                level: 'info',
+                data: { color: brick.color, points: brick.points },
               });
-              // Trigger a unique Sentry error for each brick broken
-              Sentry.captureException(
-                new Error(`Brick broken at (${brick.x},${brick.y}) - color: ${brick.color} - points: ${brick.points}`),
-                {
-                  fingerprint: [
-                    'brick-broken',
-                    brick.color // Group by color only
-                  ]
-                }
-              );
 
               // Handle trap/bonus effects
               if (brick.powerType === 'trap' && brick.powerEffect === 'slow-span') {
