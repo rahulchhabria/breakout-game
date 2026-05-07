@@ -389,16 +389,18 @@ export default function PongGame() {
                   timestamp: Math.floor(logEntry.timestamp / 1000),
                 });
               });
-              // Trigger a unique Sentry error for each brick broken
-              Sentry.captureException(
-                new Error(`Brick broken at (${brick.x},${brick.y}) - color: ${brick.color} - points: ${brick.points}`),
-                {
-                  fingerprint: [
-                    'brick-broken',
-                    brick.color // Group by color only
-                  ]
+              // Track brick destruction as a normal game event, not an error
+              Sentry.addBreadcrumb({
+                category: 'game',
+                message: 'Brick destroyed',
+                level: 'info',
+                data: {
+                  x: brick.x,
+                  y: brick.y,
+                  color: brick.color,
+                  points: brick.points,
                 }
-              );
+              });
 
               // Handle trap/bonus effects
               if (brick.powerType === 'trap' && brick.powerEffect === 'slow-span') {
