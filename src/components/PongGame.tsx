@@ -62,7 +62,9 @@ const CANVAS_HEIGHT = 600;
 const PADDLE_WIDTH = 120;
 const PADDLE_HEIGHT = 20;
 const BALL_SIZE = 12;
-const INITIAL_BALL_SPEED = 3; // Reduced from 4 for better control
+const INITIAL_BALL_SPEED = 5;
+const MAX_BALL_SPEED = 9;
+const SPEED_PER_BRICK = 0.04;
 const BRICK_WIDTH = 75;
 const BRICK_HEIGHT = 25;
 const BRICK_PADDING = 5;
@@ -322,7 +324,7 @@ export default function PongGame() {
       });
       
       newState.balls.forEach(ball => {
-        const speedMultiplier = newState.slowBallTimer > 0 ? 0.3 : 1; // Reduced slow multiplier from 0.5 to 0.3
+        const speedMultiplier = newState.slowBallTimer > 0 ? 0.6 : 1;
         ball.x += ball.dx * speedMultiplier;
         ball.y += ball.dy * speedMultiplier;
 
@@ -382,10 +384,18 @@ export default function PongGame() {
             
             brick.hits += 1;
             newState.score += brick.points;
-            
+
             if (brick.hits >= brick.maxHits) {
               brick.destroyed = true;
               playSound(440, 150);
+
+              const newSpeed = Math.min(MAX_BALL_SPEED, ball.speed + SPEED_PER_BRICK);
+              if (newSpeed !== ball.speed) {
+                const scale = newSpeed / ball.speed;
+                ball.dx *= scale;
+                ball.dy *= scale;
+                ball.speed = newSpeed;
+              }
               // Add recent logs as breadcrumbs before capturing exception
               getRecentLogs().forEach(logEntry => {
                 Sentry.addBreadcrumb({
@@ -411,7 +421,7 @@ export default function PongGame() {
               if (brick.powerType === 'trap' && brick.powerEffect === 'slow-span') {
                 Sentry.startSpan({ name: 'intentional-slow-span' }, () => {
                   const start = Date.now();
-                  while (Date.now() - start < 2000) { /* intentional busy-wait */ }
+                  while (Date.now() - start < 400) { /* intentional busy-wait */ }
                 });
               }
               
@@ -497,21 +507,16 @@ export default function PongGame() {
             case 'multiball':
               if (newState.balls.length < 5) {
                 const mainBall = newState.balls[0];
-                newState.balls.push({
-                  x: mainBall.x,
-                  y: mainBall.y,
-                  dx: mainBall.speed * 0.6, // Reduced from 0.8
-                  dy: -mainBall.speed * 0.6, // Reduced from 0.8
-                  speed: mainBall.speed,
-                  active: true,
-                });
-                newState.balls.push({
-                  x: mainBall.x,
-                  y: mainBall.y,
-                  dx: -mainBall.speed * 0.6, // Reduced from 0.8
-                  dy: -mainBall.speed * 0.6, // Reduced from 0.8
-                  speed: mainBall.speed,
-                  active: true,
+                const spawnAngles = [Math.PI / 6, -Math.PI / 6];
+                spawnAngles.forEach(angle => {
+                  newState.balls.push({
+                    x: mainBall.x,
+                    y: mainBall.y,
+                    dx: mainBall.speed * Math.sin(angle),
+                    dy: -mainBall.speed * Math.cos(angle),
+                    speed: mainBall.speed,
+                    active: true,
+                  });
                 });
               }
               break;
