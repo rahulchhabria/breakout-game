@@ -428,6 +428,9 @@ export default function PongGame() {
         spawnFloatingText(state, brickX, brickY, '+500', '#fbbf24');
         break;
     }
+    if (effect) {
+      posthog.capture('bonus_effect_triggered', { effect, level: state.level, score: state.score });
+    }
   };
 
   const applyTrapEffect = (state: GameState, effect: string | null | undefined, brickX: number, brickY: number) => {
@@ -473,6 +476,9 @@ export default function PongGame() {
         });
         spawnFloatingText(state, brickX, brickY, 'SLOW SPAN', '#f87171');
         break;
+    }
+    if (effect) {
+      posthog.capture('trap_effect_triggered', { effect, level: state.level, score: state.score, lives: state.lives });
     }
   };
 
@@ -613,6 +619,9 @@ export default function PongGame() {
               // Combo + multiplier
               newState.combo += 1;
               if (newState.combo > newState.bestCombo) newState.bestCombo = newState.combo;
+              if (newState.combo === 5 || newState.combo === 10 || newState.combo === 20) {
+                posthog.capture('combo_milestone_reached', { combo: newState.combo, level: newState.level, score: newState.score });
+              }
               const multiplier = 1 + Math.floor((newState.combo - 1) / 4); // x1 at 1-4, x2 at 5-8, ...
               const gained = brick.points * multiplier;
               newState.score += gained;
