@@ -15,6 +15,20 @@ export default defineConfig({
     sourcemap: true,
     // minify: 'esbuild', // Uncomment if you want, but test with and without if issues return
   },
+  server: {
+    proxy: {
+      '/ingest/static': {
+        target: 'https://us-assets.i.posthog.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ingest\/static/, '/static'),
+      },
+      '/ingest': {
+        target: 'https://us.i.posthog.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ingest/, ''),
+      },
+    },
+  },
   plugins: [
     react(),
     sentryVitePlugin({
