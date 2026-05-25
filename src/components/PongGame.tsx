@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import { log, getRecentLogs } from '../utils/logger';
 import * as Sentry from '@sentry/react';
+import posthog from '../posthog';
 
 interface Brick {
   x: number;
@@ -229,6 +230,7 @@ export default function PongGame() {
 
   const startGame = () => {
     log.info('Game started', { lives: gameState.lives, level: gameState.level });
+    posthog.capture('game_started', { lives: gameState.lives, level: gameState.level });
     setGameState(prev => ({
       ...prev,
       isPlaying: true,
@@ -240,10 +242,14 @@ export default function PongGame() {
 
   const pauseGame = () => {
     const newPauseState = !gameState.isPaused;
-    log.debug('Game pause state changed', { 
+    log.debug('Game pause state changed', {
       isPaused: newPauseState,
       score: gameState.score,
-      lives: gameState.lives 
+      lives: gameState.lives
+    });
+    posthog.capture(newPauseState ? 'game_paused' : 'game_resumed', {
+      score: gameState.score,
+      lives: gameState.lives,
     });
     setGameState(prev => ({
       ...prev,
@@ -253,6 +259,7 @@ export default function PongGame() {
 
   const resetGame = () => {
     log.info('Game reset', { finalScore: gameState.score });
+    posthog.capture('game_reset', { score: gameState.score, lives: gameState.lives });
     setGameState({
       balls: [{
         x: CANVAS_WIDTH / 2,
@@ -404,7 +411,7 @@ export default function PongGame() {
               if (brick.powerType === 'trap' && brick.powerEffect === 'slow-span') {
                 Sentry.startSpan({ name: 'intentional-slow-span' }, () => {
                   const start = Date.now();
-                  while (Date.now() - start < 2000) {}
+                  while (Date.now() - start < 2000) { /* intentional busy-wait */ }
                 });
               }
               
@@ -427,16 +434,23 @@ export default function PongGame() {
       // Check if all balls are gone
       if (newState.balls.length === 0) {
         newState.lives -= 1;
-        log.warn('Life lost', { 
+        log.warn('Life lost', {
           remainingLives: newState.lives,
           score: newState.score
         });
-        
+        posthog.capture('life_lost', { remaining_lives: newState.lives, score: newState.score });
+
         if (newState.lives <= 0) {
+          const bricksDestroyed = newState.bricks.filter(b => b.destroyed).length;
           log.info('Game over', {
             finalScore: newState.score,
-            bricksDestroyed: newState.bricks.filter(b => b.destroyed).length,
+            bricksDestroyed,
             totalBricks: newState.bricks.length
+          });
+          posthog.capture('game_over', {
+            score: newState.score,
+            bricks_destroyed: bricksDestroyed,
+            total_bricks: newState.bricks.length,
           });
           newState.gameOver = true;
           newState.isPlaying = false;
@@ -470,7 +484,8 @@ export default function PongGame() {
             type: powerUp.type,
             position: { x: powerUp.x, y: powerUp.y }
           });
-          
+          posthog.capture('power_up_collected', { type: powerUp.type, score: newState.score });
+
           playSound(550, 200);
           
           switch (powerUp.type) {
@@ -528,6 +543,11 @@ export default function PongGame() {
           finalScore: newState.score,
           lives: newState.lives,
           powerUpsCollected: newState.powerUps.length
+        });
+        posthog.capture('game_won', {
+          score: newState.score,
+          lives_remaining: newState.lives,
+          total_bricks: newState.bricks.length,
         });
         newState.gameWon = true;
         newState.isPlaying = false;
@@ -751,6 +771,7 @@ export default function PongGame() {
     if (!initials.trim()) return;
     const entry = { initials: initials.trim().toUpperCase().slice(0, 3), score: gameState.score };
     const updated = [...leaderboard, entry].sort((a, b) => b.score - a.score).slice(0, 10);
+    posthog.capture('leaderboard_score_saved', { initials: entry.initials, score: entry.score });
     setLeaderboard(updated);
     localStorage.setItem('breakout-leaderboard', JSON.stringify(updated));
     setShowInitialsPrompt(false);
@@ -838,7 +859,7 @@ export default function PongGame() {
                       Save
                     </button>
                     <button
-                      onClick={() => { setShowInitialsPrompt(false); setInitials(''); }}
+                      onClick={() => { posthog.capture('leaderboard_score_skipped', { score: gameState.score }); setShowInitialsPrompt(false); setInitials(''); }}
                       className="bg-gray-600 hover:bg-gray-700 px-6 py-2 rounded-lg font-semibold text-lg transition-all duration-200 transform hover:scale-105"
                     >
                       Skip
@@ -953,7 +974,7 @@ export default function PongGame() {
             </div>
 
             <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
+              onClick={() => { const next = !soundEnabled; posthog.capture('sound_toggled', { sound_enabled: next }); setSoundEnabled(next); }}
               className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
             >
               {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}

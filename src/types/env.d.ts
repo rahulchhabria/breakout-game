@@ -2,7 +2,8 @@
 
 interface ImportMetaEnv {
   readonly VITE_SENTRY_DSN: string;
-  // add more env variables here as needed
+  readonly VITE_PUBLIC_POSTHOG_KEY: string;
+  readonly VITE_PUBLIC_POSTHOG_HOST: string;
 }
 
 interface ImportMeta {
