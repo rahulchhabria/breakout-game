@@ -693,7 +693,7 @@ export default function PongGame() {
 
       // Life loss
       if (newState.balls.length === 0) {
-        newState.lives -= 1;
+        newState.lives = Math.max(0, newState.lives - 1);
         newState.combo = 0;
         triggerShake(newState, 14, 18);
         log.warn('Life lost', { remainingLives: newState.lives, score: newState.score });
