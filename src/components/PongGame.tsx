@@ -1180,7 +1180,7 @@ export default function PongGame() {
 
   const remainingBricks = gameState.bricks.filter(brick => !brick.destroyed).length;
   const livesDisplay = gameState.lives <= 5
-    ? '❤️'.repeat(gameState.lives)
+    ? '❤️'.repeat(Math.max(0, gameState.lives))
     : `❤️ × ${gameState.lives}`;
 
   return (
