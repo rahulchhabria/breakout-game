@@ -1,21 +1,25 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="1" failures="0" errors="0" time="1.72">
-    <testsuite name="src/components/PongGame.test.tsx" timestamp="2026-05-25T22:02:21.971Z" hostname="Sentry-io-MacBook-Air-LD6VP7GQHG" tests="1" failures="0" errors="0" skipped="0" time="0.042">
-        <testcase classname="src/components/PongGame.test.tsx" name="PongGame &gt; renders the game title" time="0.042">
+<testsuites name="vitest tests" tests="3" failures="0" errors="0" time="0.908">
+    <testsuite name="src/components/PongGame.test.tsx" timestamp="2026-06-10T11:11:17.113Z" hostname="cursor" tests="3" failures="0" errors="0" skipped="0" time="0.047">
+        <testcase classname="src/components/PongGame.test.tsx" name="PongGame &gt; renders the game title" time="0.046">
             <system-err>
 Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
-    at module.exports (/Users/rahulchhabria/Documents/GitHub/breakout-game/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
-    at HTMLCanvasElementImpl.getContext (/Users/rahulchhabria/Documents/GitHub/breakout-game/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
-    at HTMLCanvasElement.getContext (/Users/rahulchhabria/Documents/GitHub/breakout-game/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
-    at /Users/rahulchhabria/Documents/GitHub/breakout-game/src/components/PongGame.tsx:855:24
-    at /Users/rahulchhabria/Documents/GitHub/breakout-game/src/components/PongGame.tsx:1120:31
-    at commitHookEffectListMount (/Users/rahulchhabria/Documents/GitHub/breakout-game/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
-    at commitPassiveMountOnFiber (/Users/rahulchhabria/Documents/GitHub/breakout-game/node_modules/react-dom/cjs/react-dom.development.js:24970:11)
-    at commitPassiveMountEffects_complete (/Users/rahulchhabria/Documents/GitHub/breakout-game/node_modules/react-dom/cjs/react-dom.development.js:24930:9)
-    at commitPassiveMountEffects_begin (/Users/rahulchhabria/Documents/GitHub/breakout-game/node_modules/react-dom/cjs/react-dom.development.js:24917:7)
-    at commitPassiveMountEffects (/Users/rahulchhabria/Documents/GitHub/breakout-game/node_modules/react-dom/cjs/react-dom.development.js:24905:3) undefined
+    at module.exports (/workspace/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/workspace/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/workspace/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at /workspace/src/components/PongGame.tsx:865:24
+    at /workspace/src/components/PongGame.tsx:1133:31
+    at commitHookEffectListMount (/workspace/node_modules/react-dom/cjs/react-dom.development.js:23189:26)
+    at commitPassiveMountOnFiber (/workspace/node_modules/react-dom/cjs/react-dom.development.js:24970:11)
+    at commitPassiveMountEffects_complete (/workspace/node_modules/react-dom/cjs/react-dom.development.js:24930:9)
+    at commitPassiveMountEffects_begin (/workspace/node_modules/react-dom/cjs/react-dom.development.js:24917:7)
+    at commitPassiveMountEffects (/workspace/node_modules/react-dom/cjs/react-dom.development.js:24905:3) undefined
 
             </system-err>
+        </testcase>
+        <testcase classname="src/components/PongGame.test.tsx" name="PongGame &gt; handles negative lives gracefully without RangeError" time="0.001">
+        </testcase>
+        <testcase classname="src/components/PongGame.test.tsx" name="PongGame &gt; guards life decrement from going negative" time="0">
         </testcase>
     </testsuite>
 </testsuites>
