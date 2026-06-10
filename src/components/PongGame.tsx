@@ -146,6 +146,7 @@ const clampMinDy = (ball: Ball) => {
 export default function PongGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
+  const isLoopRunningRef = useRef(false);
   const keysDownRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
   const mousePaddleXRef = useRef<number | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -693,7 +694,7 @@ export default function PongGame() {
 
       // Life loss
       if (newState.balls.length === 0) {
-        newState.lives -= 1;
+        newState.lives = Math.max(0, newState.lives - 1);
         newState.combo = 0;
         triggerShake(newState, 14, 18);
         log.warn('Life lost', { remainingLives: newState.lives, score: newState.score });
@@ -1112,14 +1113,17 @@ export default function PongGame() {
 
   // Animation loop
   useEffect(() => {
-    if (!gameState.isPlaying) return;
+    if (!gameState.isPlaying || isLoopRunningRef.current) return;
+    isLoopRunningRef.current = true;
     const gameLoop = () => {
+      if (!isLoopRunningRef.current) return;
       updateGame();
       render();
       animationRef.current = requestAnimationFrame(gameLoop);
     };
     animationRef.current = requestAnimationFrame(gameLoop);
     return () => {
+      isLoopRunningRef.current = false;
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
   }, [gameState.isPlaying, updateGame, render]);
@@ -1180,7 +1184,7 @@ export default function PongGame() {
 
   const remainingBricks = gameState.bricks.filter(brick => !brick.destroyed).length;
   const livesDisplay = gameState.lives <= 5
-    ? '❤️'.repeat(gameState.lives)
+    ? '❤️'.repeat(Math.max(0, gameState.lives))
     : `❤️ × ${gameState.lives}`;
 
   return (
