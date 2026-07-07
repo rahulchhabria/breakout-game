@@ -1368,7 +1368,7 @@ export default function PongGame() {
             <div className="flex gap-2 flex-wrap">
               {!gameState.isPlaying || gameState.gameOver || gameState.gameWon ? (
                 <button
-                  onClick={startGame}
+                  onClick={gameState.gameOver || gameState.gameWon ? resetGame : startGame}
                   className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   <Play size={16} />
