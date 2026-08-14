@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import PongGame from './components/PongGame';
 import * as Sentry from '@sentry/react';
 
