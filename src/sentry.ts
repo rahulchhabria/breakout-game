@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/react';
 // Initialize Sentry as early as possible
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN || 'https://fff74e528b4cafe486546e7e9898d710@o4506312335294464.ingest.us.sentry.io/4509563503640576',
+  release: import.meta.env.DEV ? 'breakout-game@dev' : undefined,
   environment: import.meta.env.MODE,
   debug: import.meta.env.DEV,
   enableLogs: true,

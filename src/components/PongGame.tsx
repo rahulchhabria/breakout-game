@@ -1,10 +1,18 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX } from 'lucide-react';
-import { log, getRecentLogs } from '../utils/logger';
-import * as Sentry from '@sentry/react';
-import posthog from '../posthog';
+import { log } from '../utils/logger';
+import {
+  createGameSessionId,
+  emitBrickBreakTelemetry,
+  triggerGroupedDemoEvent,
+  triggerSlowDemoSpan,
+  triggerUniqueDemoIssue,
+  triggerWarningDemoLog,
+  type BrickBreakTelemetry,
+} from '../sentry-demo';
 
 interface Brick {
+  id: string;
   x: number;
   y: number;
   width: number;
@@ -17,6 +25,7 @@ interface Brick {
   powerType?: 'bonus' | 'trap' | null;
   powerEffect?: string | null;
   icon?: string | null;
+  isBug: boolean;
 }
 
 interface PowerUp {
@@ -86,6 +95,7 @@ interface GameState {
   shakeFrames: number;
   shakeIntensity: number;
   levelBannerFrames: number;
+  pendingTelemetry: BrickBreakTelemetry[];
 }
 
 const CANVAS_WIDTH = 800;
@@ -106,6 +116,7 @@ const PADDLE_SPEED = 9;
 const MIN_DY_RATIO = 0.25; // ball will never travel flatter than this fraction of its speed
 const COMBO_RESET_ON_PADDLE = true;
 const LIFE_BONUS = 500;
+const BUG_BRICK_INDICES = [4, 18, 37, 56, 73];
 
 const BRICK_COLORS = [
   { color: '#ef4444', points: 70, hits: 1 },
@@ -129,7 +140,6 @@ const TRAP_EFFECTS = [
   { effect: 'reverse-controls', icon: '🔄', label: 'Reverse Controls' },
   { effect: 'lose-life', icon: '💔', label: 'Lose a Life' },
   { effect: 'speed-up', icon: '⚡', label: 'Speed Up Ball' },
-  { effect: 'slow-span', icon: '🐢', label: 'Slow Sentry Span' },
 ];
 
 const clampMinDy = (ball: Ball) => {
@@ -148,10 +158,19 @@ export default function PongGame() {
   const animationRef = useRef<number>();
   const keysDownRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
   const mousePaddleXRef = useRef<number | null>(null);
+  const gameSessionIdRef = useRef<string | null>(null);
+  if (gameSessionIdRef.current === null) gameSessionIdRef.current = createGameSessionId();
+  const emittedTelemetryIdsRef = useRef(new Set<string>());
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [initials, setInitials] = useState('');
   const [showInitialsPrompt, setShowInitialsPrompt] = useState(false);
   const [leaderboard, setLeaderboard] = useState<{ initials: string; score: number }[]>([]);
+  const [sentryTriggerStatus, setSentryTriggerStatus] = useState('');
+
+  const getGameSessionId = () => {
+    gameSessionIdRef.current ??= createGameSessionId();
+    return gameSessionIdRef.current;
+  };
 
   const createBricks = (level = 1): Brick[] => {
     const bricks: Brick[] = [];
@@ -164,12 +183,16 @@ export default function PongGame() {
 
     for (let row = 0; row < BRICK_ROWS; row++) {
       for (let col = 0; col < BRICK_COLS; col++) {
+        const brickIndex = row * BRICK_COLS + col;
+        const isBug = BUG_BRICK_INDICES.includes(brickIndex);
         const brickType = BRICK_COLORS[row] || BRICK_COLORS[BRICK_COLORS.length - 1];
         let powerType: 'bonus' | 'trap' | null = null;
         let powerEffect: string | null = null;
         let icon: string | null = null;
         const rand = Math.random();
-        if (rand < bonusChance) {
+        if (isBug) {
+          icon = '🐛';
+        } else if (rand < bonusChance) {
           powerType = 'bonus';
           const bonus = BONUS_EFFECTS[Math.floor(Math.random() * BONUS_EFFECTS.length)];
           powerEffect = bonus.effect;
@@ -181,6 +204,7 @@ export default function PongGame() {
           icon = trap.icon;
         }
         bricks.push({
+          id: `level-${level}-brick-${row}-${col}`,
           x: startX + col * (BRICK_WIDTH + BRICK_PADDING),
           y: startY + row * (BRICK_HEIGHT + BRICK_PADDING),
           width: BRICK_WIDTH,
@@ -193,6 +217,7 @@ export default function PongGame() {
           powerType,
           powerEffect,
           icon,
+          isBug,
         });
       }
     }
@@ -239,7 +264,24 @@ export default function PongGame() {
     shakeFrames: 0,
     shakeIntensity: 0,
     levelBannerFrames: 0,
+    pendingTelemetry: [],
   });
+
+  useEffect(() => {
+    if (gameState.pendingTelemetry.length === 0) return;
+
+    const telemetryIds = new Set(gameState.pendingTelemetry.map(event => event.id));
+    gameState.pendingTelemetry.forEach(event => {
+      if (emittedTelemetryIdsRef.current.has(event.id)) return;
+      emittedTelemetryIdsRef.current.add(event.id);
+      emitBrickBreakTelemetry(event);
+    });
+
+    setGameState(prev => ({
+      ...prev,
+      pendingTelemetry: prev.pendingTelemetry.filter(event => !telemetryIds.has(event.id)),
+    }));
+  }, [gameState.pendingTelemetry]);
 
   const playSound = useCallback((frequency: number, duration: number = 100) => {
     if (!soundEnabled) return;
@@ -331,7 +373,6 @@ export default function PongGame() {
 
   const startGame = () => {
     log.info('Game started', { lives: gameState.lives, level: gameState.level });
-    posthog.capture('game_started', { lives: gameState.lives, level: gameState.level });
     setGameState(prev => ({
       ...prev,
       isPlaying: true,
@@ -348,16 +389,13 @@ export default function PongGame() {
       score: gameState.score,
       lives: gameState.lives,
     });
-    posthog.capture(newPauseState ? 'game_paused' : 'game_resumed', {
-      score: gameState.score,
-      lives: gameState.lives,
-    });
     setGameState(prev => ({ ...prev, isPaused: newPauseState }));
   };
 
   const resetGame = () => {
     log.info('Game reset', { finalScore: gameState.score });
-    posthog.capture('game_reset', { score: gameState.score, lives: gameState.lives });
+    gameSessionIdRef.current = createGameSessionId();
+    emittedTelemetryIdsRef.current.clear();
     setGameState({
       balls: [buildInitialBall()],
       paddle: {
@@ -387,6 +425,7 @@ export default function PongGame() {
       shakeFrames: 0,
       shakeIntensity: 0,
       levelBannerFrames: 0,
+      pendingTelemetry: [],
     });
   };
 
@@ -428,9 +467,6 @@ export default function PongGame() {
         spawnFloatingText(state, brickX, brickY, '+500', '#fbbf24');
         break;
     }
-    if (effect) {
-      posthog.capture('bonus_effect_triggered', { effect, level: state.level, score: state.score });
-    }
   };
 
   const applyTrapEffect = (state: GameState, effect: string | null | undefined, brickX: number, brickY: number) => {
@@ -468,17 +504,6 @@ export default function PongGame() {
         });
         spawnFloatingText(state, brickX, brickY, 'SPEED UP', '#f87171');
         break;
-      case 'slow-span':
-        // Intentional slow span for the Sentry demo.
-        Sentry.startSpan({ name: 'intentional-slow-span' }, () => {
-          const start = Date.now();
-          while (Date.now() - start < 400) { /* intentional busy-wait */ }
-        });
-        spawnFloatingText(state, brickX, brickY, 'SLOW SPAN', '#f87171');
-        break;
-    }
-    if (effect) {
-      posthog.capture('trap_effect_triggered', { effect, level: state.level, score: state.score, lives: state.lives });
     }
   };
 
@@ -493,6 +518,7 @@ export default function PongGame() {
       newState.powerUps = prev.powerUps.map(p => ({ ...p }));
       newState.particles = prev.particles.map(p => ({ ...p }));
       newState.floatingTexts = prev.floatingTexts.map(t => ({ ...t }));
+      newState.pendingTelemetry = prev.pendingTelemetry;
 
       // Keyboard paddle movement (in-loop so it works during pauses-of-input)
       const reversed = newState.reverseTimer > 0;
@@ -619,9 +645,6 @@ export default function PongGame() {
               // Combo + multiplier
               newState.combo += 1;
               if (newState.combo > newState.bestCombo) newState.bestCombo = newState.combo;
-              if (newState.combo === 5 || newState.combo === 10 || newState.combo === 20) {
-                posthog.capture('combo_milestone_reached', { combo: newState.combo, level: newState.level, score: newState.score });
-              }
               const multiplier = 1 + Math.floor((newState.combo - 1) / 4); // x1 at 1-4, x2 at 5-8, ...
               const gained = brick.points * multiplier;
               newState.score += gained;
@@ -649,20 +672,24 @@ export default function PongGame() {
                 ball.speed = newSpeed;
               }
 
-              // Sentry demo: capture every brick break (intentional, this is a demo app)
-              getRecentLogs().forEach(logEntry => {
-                Sentry.addBreadcrumb({
-                  category: 'log',
-                  message: logEntry.message,
-                  level: logEntry.level,
-                  data: logEntry.attributes,
-                  timestamp: Math.floor(logEntry.timestamp / 1000),
-                });
-              });
-              Sentry.captureException(
-                new Error(`Brick broken at (${brick.x},${brick.y}) - color: ${brick.color} - points: ${brick.points}`),
-                { fingerprint: ['brick-broken', brick.color] }
-              );
+              const gameSessionId = getGameSessionId();
+              const telemetryId = `${gameSessionId}:${brick.id}`;
+              newState.pendingTelemetry = [
+                ...newState.pendingTelemetry,
+                {
+                  id: telemetryId,
+                  brickId: brick.id,
+                  gameSessionId,
+                  level: newState.level,
+                  score: newState.score,
+                  combo: newState.combo,
+                  color: brick.color,
+                  points: brick.points,
+                  x: brick.x,
+                  y: brick.y,
+                  createsIssue: brick.isBug,
+                },
+              ];
 
               // Apply bonus/trap effects
               if (brick.powerType === 'bonus') {
@@ -697,7 +724,6 @@ export default function PongGame() {
         newState.combo = 0;
         triggerShake(newState, 14, 18);
         log.warn('Life lost', { remainingLives: newState.lives, score: newState.score });
-        posthog.capture('life_lost', { remaining_lives: newState.lives, score: newState.score });
 
         if (newState.lives <= 0) {
           const bricksDestroyed = newState.bricks.filter(b => b.destroyed).length;
@@ -705,13 +731,6 @@ export default function PongGame() {
             finalScore: newState.score,
             bricksDestroyed,
             totalBricks: newState.bricks.length,
-          });
-          posthog.capture('game_over', {
-            score: newState.score,
-            bricks_destroyed: bricksDestroyed,
-            total_bricks: newState.bricks.length,
-            best_combo: newState.bestCombo,
-            level: newState.level,
           });
           newState.gameOver = true;
           newState.isPlaying = false;
@@ -732,7 +751,6 @@ export default function PongGame() {
           powerUp.x - 10 <= newState.paddle.x + newState.paddle.width
         ) {
           log.info('Power-up collected', { type: powerUp.type });
-          posthog.capture('power_up_collected', { type: powerUp.type, score: newState.score });
           playSound(550, 200);
 
           switch (powerUp.type) {
@@ -809,23 +827,8 @@ export default function PongGame() {
           level: newState.level,
           lifeBonus,
         });
-        posthog.capture('level_cleared', {
-          score: newState.score,
-          lives: newState.lives,
-          level: newState.level,
-          life_bonus: lifeBonus,
-          best_combo: newState.bestCombo,
-        });
-
         if (newState.level >= 5) {
           // Final clear → victory screen
-          posthog.capture('game_won', {
-            score: newState.score,
-            lives_remaining: newState.lives,
-            total_bricks: newState.bricks.length,
-            best_combo: newState.bestCombo,
-            level: newState.level,
-          });
           newState.gameWon = true;
           newState.isPlaying = false;
           playSound(660, 500);
@@ -892,7 +895,8 @@ export default function PongGame() {
         ctx.globalAlpha = alpha;
 
         let brickColor = brick.color;
-        if (brick.powerType === 'bonus') brickColor = '#facc15';
+        if (brick.isBug) brickColor = '#22d3ee';
+        else if (brick.powerType === 'bonus') brickColor = '#facc15';
         else if (brick.powerType === 'trap') brickColor = '#ef4444';
 
         const brickGradient = ctx.createLinearGradient(brick.x, brick.y, brick.x, brick.y + brick.height);
@@ -1171,11 +1175,31 @@ export default function PongGame() {
     if (!initials.trim()) return;
     const entry = { initials: initials.trim().toUpperCase().slice(0, 3), score: gameState.score };
     const updated = [...leaderboard, entry].sort((a, b) => b.score - a.score).slice(0, 10);
-    posthog.capture('leaderboard_score_saved', { initials: entry.initials, score: entry.score });
     setLeaderboard(updated);
     localStorage.setItem('breakout-leaderboard', JSON.stringify(updated));
     setShowInitialsPrompt(false);
     setInitials('');
+  };
+
+  const generateUniqueIssue = () => {
+    const triggerId = triggerUniqueDemoIssue();
+    setSentryTriggerStatus(`Created unique issue ${triggerId.slice(0, 8)}`);
+  };
+
+  const generateGroupedEvent = () => {
+    triggerGroupedDemoEvent();
+    setSentryTriggerStatus('Sent event to the shared demo issue');
+  };
+
+  const generateSlowSpan = async () => {
+    setSentryTriggerStatus('Running 500ms demo span…');
+    await triggerSlowDemoSpan();
+    setSentryTriggerStatus('Completed 500ms demo span');
+  };
+
+  const generateWarningLog = () => {
+    triggerWarningDemoLog();
+    setSentryTriggerStatus('Sent warning log');
   };
 
   const remainingBricks = gameState.bricks.filter(brick => !brick.destroyed).length;
@@ -1280,7 +1304,7 @@ export default function PongGame() {
                       Save
                     </button>
                     <button
-                      onClick={() => { posthog.capture('leaderboard_score_skipped', { score: gameState.score }); setShowInitialsPrompt(false); setInitials(''); }}
+                      onClick={() => { setShowInitialsPrompt(false); setInitials(''); }}
                       className="bg-gray-600 hover:bg-gray-700 px-6 py-2 rounded-lg font-semibold text-lg transition-all duration-200 transform hover:scale-105"
                     >
                       Skip
@@ -1393,7 +1417,7 @@ export default function PongGame() {
             </div>
 
             <button
-              onClick={() => { const next = !soundEnabled; posthog.capture('sound_toggled', { sound_enabled: next }); setSoundEnabled(next); }}
+              onClick={() => setSoundEnabled(current => !current)}
               className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
             >
               {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
@@ -1401,12 +1425,57 @@ export default function PongGame() {
             </button>
           </div>
 
+          {/* Deterministic Sentry demo controls */}
+          <section
+            aria-labelledby="sentry-demo-title"
+            className="mt-4 rounded-xl border border-cyan-400/30 bg-cyan-950/30 p-3 text-white"
+          >
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 id="sentry-demo-title" className="font-semibold text-cyan-300">Sentry trigger lab</h2>
+                <p className="text-xs text-gray-400">Generate deterministic telemetry without playing a full round.</p>
+              </div>
+              <p aria-live="polite" className="min-h-5 text-xs text-cyan-200">{sentryTriggerStatus}</p>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <button
+                type="button"
+                onClick={generateUniqueIssue}
+                className="rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium transition-colors hover:bg-cyan-500"
+              >
+                New issue
+              </button>
+              <button
+                type="button"
+                onClick={generateGroupedEvent}
+                className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium transition-colors hover:bg-indigo-500"
+              >
+                Grouped event
+              </button>
+              <button
+                type="button"
+                onClick={() => void generateSlowSpan()}
+                className="rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium transition-colors hover:bg-amber-500"
+              >
+                Slow span
+              </button>
+              <button
+                type="button"
+                onClick={generateWarningLog}
+                className="rounded-lg bg-slate-600 px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-500"
+              >
+                Warning log
+              </button>
+            </div>
+          </section>
+
           {/* Instructions */}
           <div className="mt-4 text-center text-gray-400 text-xs sm:text-sm">
             <p>Mouse / ← → / A D to move • Space launches and pauses • P or Esc to pause • R to reset</p>
             <p className="mt-1">
+              <span className="text-cyan-300">🐛 bug bricks create new Sentry issues</span> &nbsp;•&nbsp;
               <span className="text-yellow-400">⭐ ⬆️ 💥 💰</span> bonus bricks &nbsp;•&nbsp;
-              <span className="text-red-400">⬇️ 🔄 💔 ⚡ 🐢</span> trap bricks
+              <span className="text-red-400">⬇️ 🔄 💔 ⚡</span> trap bricks
             </p>
             <p className="mt-1">
               Power-up drops:&nbsp;

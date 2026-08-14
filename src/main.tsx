@@ -1,7 +1,5 @@
 // Import Sentry instrumentation first
 import './sentry';
-// Import PostHog instrumentation
-import './posthog';
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
