@@ -18,6 +18,7 @@ pnpm-debug.log*
 
 # Env files
 .env*
+!.env.sentry-build-plugin.example
 
 # Tailwind CSS JIT cache
 .tailwindcss*
