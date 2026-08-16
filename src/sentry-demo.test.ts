@@ -28,8 +28,8 @@ import {
 } from './sentry-demo';
 
 const brickBreak: BrickBreakTelemetry = {
-  id: 'session-1:level-1-brick-0-4',
-  brickId: 'level-1-brick-0-4',
+  id: 'session-1:level-1-brick-5-6',
+  brickId: 'level-1-brick-5-6',
   gameSessionId: 'session-1',
   level: 1,
   score: 70,
@@ -38,7 +38,7 @@ const brickBreak: BrickBreakTelemetry = {
   points: 70,
   x: 42,
   y: 60,
-  createsIssue: true,
+  isBugBrick: true,
 };
 
 describe('Sentry demo telemetry', () => {
@@ -46,27 +46,30 @@ describe('Sentry demo telemetry', () => {
     vi.clearAllMocks();
   });
 
-  it('creates a uniquely fingerprinted issue for a bug brick', () => {
+  it('regresses BREAKOUT-GAME-FR by logging the bug-brick hit without creating an issue', () => {
     emitBrickBreakTelemetry(brickBreak);
 
-    expect(mocks.captureException).toHaveBeenCalledOnce();
-    expect(mocks.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
+    expect(mocks.warn).toHaveBeenCalledWith(
+      'Bug brick destroyed',
       expect.objectContaining({
-        fingerprint: ['breakout-bug-brick', 'session-1', 'level-1-brick-0-4'],
+        brick_id: 'level-1-brick-5-6',
+        game_session_id: 'session-1',
+        level: 1,
       }),
     );
+    expect(mocks.captureException).not.toHaveBeenCalled();
     expect(mocks.info).not.toHaveBeenCalled();
   });
 
   it('records an ordinary brick as a structured log without creating an issue', () => {
-    emitBrickBreakTelemetry({ ...brickBreak, createsIssue: false });
+    emitBrickBreakTelemetry({ ...brickBreak, isBugBrick: false });
 
     expect(mocks.info).toHaveBeenCalledWith(
       'Brick destroyed',
-      expect.objectContaining({ brick_id: 'level-1-brick-0-4', level: 1 }),
+      expect.objectContaining({ brick_id: 'level-1-brick-5-6', level: 1 }),
     );
     expect(mocks.captureException).not.toHaveBeenCalled();
+    expect(mocks.warn).not.toHaveBeenCalled();
   });
 
   it('creates a different fingerprint for each manual unique issue', () => {

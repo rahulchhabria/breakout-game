@@ -37,3 +37,4 @@ coverage/
 .vercel
 .env
 .env*.local
+.sentry-deck/

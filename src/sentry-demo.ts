@@ -12,7 +12,7 @@ export interface BrickBreakTelemetry {
   points: number;
   x: number;
   y: number;
-  createsIssue: boolean;
+  isBugBrick: boolean;
 }
 
 const createId = () => {
@@ -38,22 +38,12 @@ export function emitBrickBreakTelemetry(event: BrickBreakTelemetry) {
     y: event.y,
   };
 
-  if (!event.createsIssue) {
+  if (!event.isBugBrick) {
     log.info('Brick destroyed', attributes);
     return;
   }
 
-  Sentry.captureException(new Error(`Bug brick destroyed: ${event.brickId}`), {
-    fingerprint: ['breakout-bug-brick', event.gameSessionId, event.brickId],
-    tags: {
-      trigger: 'bug-brick',
-      brick_id: event.brickId,
-      game_level: String(event.level),
-    },
-    contexts: {
-      brick: attributes,
-    },
-  });
+  log.warn('Bug brick destroyed', attributes);
 }
 
 export function triggerUniqueDemoIssue() {

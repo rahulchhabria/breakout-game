@@ -687,7 +687,7 @@ export default function PongGame() {
                   points: brick.points,
                   x: brick.x,
                   y: brick.y,
-                  createsIssue: brick.isBug,
+                  isBugBrick: brick.isBug,
                 },
               ];
 
@@ -1473,7 +1473,7 @@ export default function PongGame() {
           <div className="mt-4 text-center text-gray-400 text-xs sm:text-sm">
             <p>Mouse / ← → / A D to move • Space launches and pauses • P or Esc to pause • R to reset</p>
             <p className="mt-1">
-              <span className="text-cyan-300">🐛 bug bricks create new Sentry issues</span> &nbsp;•&nbsp;
+              <span className="text-cyan-300">🐛 bug bricks emit Sentry warning logs</span> &nbsp;•&nbsp;
               <span className="text-yellow-400">⭐ ⬆️ 💥 💰</span> bonus bricks &nbsp;•&nbsp;
               <span className="text-red-400">⬇️ 🔄 💔 ⚡</span> trap bricks
             </p>
